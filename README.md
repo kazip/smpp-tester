@@ -2,6 +2,8 @@
 
 This utility is for load testing SMPP servers. It can send SubmitSMs with fixed speed
 
+It is based on go-smpp library https://github.com/linxGnu/gosmpp
+
 Usage is below
 
 ```
