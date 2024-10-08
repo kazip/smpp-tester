@@ -8,19 +8,21 @@ Usage is below
 
 ```
 Usage:
-smpp-tester [OPTIONS]
+  smpp-tester [OPTIONS]
 
 Application Options:
--s, --speed=           rate per second (default: 50)
--h, --host=            smpp server host (default: localhost)
--P, --port=            smpp server port (default: 2775)
--u, --system_id=       SMPP systemId
--p, --password=        SMPP password
--y, --skip-confirm
--t, --text=            SMS text (default: load-test)
--m, --max-count=       Maximum SMS number to send (default: -1)
--w, --wait-deliver-sm= Wait in seconds for deliver_sm after sending' (default: 10)
+  -s, --speed=           rate per second (default: 50)
+  -H, --host=            smpp server host (default: localhost)
+  -P, --port=            smpp server port (default: 2775)
+  -u, --system_id=       SMPP systemId
+  -p, --password=        SMPP password
+  -y, --skip-confirm
+  -t, --text=            SMS text (default: load-test)
+  -m, --max-count=       Maximum SMS number to send (default: -1)
+  -w, --wait-deliver-sm= Wait in seconds for deliver_sm after sending' (default: 10)
+  -F, --from=            source address (default: test)
+  -T, --to=              destination address (default: test)
 
 Help Options:
--h, --help             Show this help message
+  -h, --help             Show this help message
 ```

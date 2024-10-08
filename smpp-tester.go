@@ -73,7 +73,7 @@ func main() {
 
 	var opts struct {
 		Rps           int    `long:"speed" short:"s" description:"rate per second" default:"50"`
-		Host          string `long:"host" short:"h" description:"smpp server host" default:"localhost"`
+		Host          string `long:"host" short:"H" description:"smpp server host" default:"localhost"`
 		Port          uint   `long:"port" short:"P" description:"smpp server port" default:"2775"`
 		SystemId      string `long:"system_id" short:"u" description:"SMPP systemId" required:"true"`
 		Password      string `long:"password" short:"p" description:"SMPP password" required:"true"`
@@ -81,6 +81,8 @@ func main() {
 		Text          string `long:"text" short:"t" description:"SMS text" default:"load-test"`
 		MaxCount      int    `long:"max-count" short:"m" description:"Maximum SMS number to send" default:"-1"`
 		WaitDeliverSm int    `long:"wait-deliver-sm" short:"w" description:"Wait in seconds for deliver_sm after sending'" default:"10"`
+		From          string `long:"from" short:"F" description:"source address" default:"test"`
+		To            string `long:"to" short:"T" description:"destination address" default:"test"`
 	}
 
 	_, err := flags.Parse(&opts)
@@ -131,7 +133,7 @@ func main() {
 	n := 0
 	for {
 		<-ticker.C
-		sendSubmitSm(trans, opts.Text)
+		sendSubmitSm(trans, opts.Text, opts.From, opts.To)
 		n++
 		currentRps := float64(n) / time.Since(start).Seconds()
 		log.Println("Speed is: ", currentRps)
@@ -147,12 +149,11 @@ func main() {
 
 }
 
-func sendSubmitSm(trans *gosmpp.Session, text string) {
+func sendSubmitSm(trans *gosmpp.Session, text string, from string, to string) {
 	submitSm := pdu.NewSubmitSM().(*pdu.SubmitSM)
-	srcAddr := pdu.NewAddress()
-	srcAddr.SetTon(5)
-	srcAddr.SetNpi(0)
-	_ = srcAddr.SetAddress("test")
+
+	srcAddr, _ := pdu.NewAddressWithAddr(from)
+	dstAddr, _ := pdu.NewAddressWithAddr(to)
 
 	message, err := pdu.NewShortMessage(text)
 
@@ -162,7 +163,7 @@ func sendSubmitSm(trans *gosmpp.Session, text string) {
 	}
 
 	submitSm.SourceAddr = srcAddr
-	submitSm.DestAddr = srcAddr
+	submitSm.DestAddr = dstAddr
 	submitSm.Message = message
 
 	err = trans.Transmitter().Submit(submitSm)
