@@ -1,0 +1,4 @@
+services:
+  smpp-tester:
+    build:
+      context: .
