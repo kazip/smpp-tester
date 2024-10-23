@@ -1,4 +1,10 @@
+name: go
 services:
-  smpp-tester:
+  smpp:
     build:
       context: .
+      dockerfile: Dockerfile
+    stdin_open: true
+    tty: true
+    restart: 'no'
+    init: true

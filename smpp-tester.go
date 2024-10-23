@@ -37,11 +37,12 @@ func handlePDU() func(pdu.PDU) (pdu.PDU, bool) {
 			return pd.GetResponse(), false
 
 		case *pdu.DataSM:
-			log.Println("DataSM receiver")
+			log.Println("DataSM Received")
 			return pd.GetResponse(), false
 
 		case *pdu.DeliverSM:
-			log.Println("DeliverSM receiver")
+			log.Println("DeliverSM Received")
+			log.Println(pd.Message.GetMessage())
 			return pd.GetResponse(), false
 		}
 		return nil, false
@@ -83,11 +84,11 @@ func main() {
 		WaitDeliverSm int    `long:"wait-deliver-sm" short:"w" description:"Wait in seconds for deliver_sm after sending'" default:"10"`
 		From          string `long:"from" short:"F" description:"source address" default:"test"`
 		To            string `long:"to" short:"T" description:"destination address" default:"test"`
+		TTL           int    `long:"ttl" description:"ttl" default:"60"`
 	}
 
 	_, err := flags.Parse(&opts)
 	if err != nil {
-		//log.Println(err)
 		os.Exit(1)
 	}
 
@@ -133,7 +134,7 @@ func main() {
 	n := 0
 	for {
 		<-ticker.C
-		sendSubmitSm(trans, opts.Text, opts.From, opts.To)
+		sendSubmitSm(trans, opts.Text, opts.From, opts.To, opts.TTL)
 		n++
 		currentRps := float64(n) / time.Since(start).Seconds()
 		log.Println("Speed is: ", currentRps)
@@ -149,7 +150,20 @@ func main() {
 
 }
 
-func sendSubmitSm(trans *gosmpp.Session, text string, from string, to string) {
+func formatValidityPeriod(ttl int) string {
+	// Создаем текущую метку времени
+	now := time.Now().UTC()
+
+	// Добавляем ttl к текущему времени
+	validityTime := now.Add(time.Duration(ttl) * time.Second)
+
+	// Форматируем строку по требуемому формату "yyMMddHHmmss000R"
+	validityPeriod := validityTime.Format("060102150405") + "000+"
+
+	return validityPeriod
+}
+
+func sendSubmitSm(trans *gosmpp.Session, text string, from string, to string, ttl int) {
 	submitSm := pdu.NewSubmitSM().(*pdu.SubmitSM)
 
 	srcAddr, _ := pdu.NewAddressWithAddr(from)
@@ -165,6 +179,7 @@ func sendSubmitSm(trans *gosmpp.Session, text string, from string, to string) {
 	submitSm.SourceAddr = srcAddr
 	submitSm.DestAddr = dstAddr
 	submitSm.Message = message
+	submitSm.ValidityPeriod = formatValidityPeriod(ttl)
 
 	err = trans.Transmitter().Submit(submitSm)
 
