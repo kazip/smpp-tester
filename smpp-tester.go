@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/jessevdk/go-flags"
 	"github.com/linxGnu/gosmpp"
+	"github.com/linxGnu/gosmpp/data"
 	"github.com/linxGnu/gosmpp/pdu"
 	"log"
 	"os"
@@ -80,6 +81,7 @@ func main() {
 		Password      string `long:"password" short:"p" description:"SMPP password" required:"true"`
 		SkipConfirm   bool   `long:"skip-confirm" short:"y"`
 		Text          string `long:"text" short:"t" description:"SMS text" default:"load-test"`
+		Encoding      string `long:"encoding" short:"e" description:"SMS text encoding: gsm7bit, ucs2, latin1" default:"ucs2"`
 		MaxCount      int    `long:"max-count" short:"m" description:"Maximum SMS number to send" default:"-1"`
 		WaitDeliverSm int    `long:"wait-deliver-sm" short:"w" description:"Wait in seconds for deliver_sm after sending'" default:"10"`
 		From          string `long:"from" short:"F" description:"source address" default:"test"`
@@ -134,7 +136,7 @@ func main() {
 	n := 0
 	for {
 		<-ticker.C
-		sendSubmitSm(trans, opts.Text, opts.From, opts.To, opts.TTL)
+		sendSubmitSm(trans, opts.Text, opts.Encoding, opts.From, opts.To, opts.TTL)
 		n++
 		currentRps := float64(n) / time.Since(start).Seconds()
 		log.Println("Speed is: ", currentRps)
@@ -163,13 +165,36 @@ func formatValidityPeriod(ttl int) string {
 	return validityPeriod
 }
 
-func sendSubmitSm(trans *gosmpp.Session, text string, from string, to string, ttl int) {
+func sendSubmitSm(trans *gosmpp.Session, text string, encoding string, from string, to string, ttl int) {
 	submitSm := pdu.NewSubmitSM().(*pdu.SubmitSM)
 
 	srcAddr, _ := pdu.NewAddressWithAddr(from)
 	dstAddr, _ := pdu.NewAddressWithAddr(to)
 
-	message, err := pdu.NewShortMessage(text)
+	var enc data.Encoding
+	switch strings.ToLower(encoding) {
+	case "ucs2":
+		enc = data.UCS2
+	case "gsm7bit":
+		enc = data.GSM7BIT
+	case "gsm7bit_packed":
+		enc = data.GSM7BITPACKED
+	case "latin1":
+		enc = data.LATIN1
+	case "ascii":
+		enc = data.ASCII
+	case "cyrillic":
+		enc = data.CYRILLIC
+	case "binary8bit1":
+		enc = data.BINARY8BIT1
+	case "binary8bit2":
+		enc = data.BINARY8BIT2
+	case "hebrew":
+		enc = data.HEBREW
+	default:
+		enc = data.UCS2
+	}
+	message, err := pdu.NewShortMessageWithEncoding(text, enc)
 
 	if err != nil {
 		log.Println(err)
@@ -180,6 +205,8 @@ func sendSubmitSm(trans *gosmpp.Session, text string, from string, to string, tt
 	submitSm.DestAddr = dstAddr
 	submitSm.Message = message
 	submitSm.ValidityPeriod = formatValidityPeriod(ttl)
+
+	log.Printf("using %T encoding", enc)
 
 	err = trans.Transmitter().Submit(submitSm)
 
