@@ -87,6 +87,7 @@ func main() {
 		From          string `long:"from" short:"F" description:"source address" default:"test"`
 		To            string `long:"to" short:"T" description:"destination address" default:"test"`
 		TTL           int    `long:"ttl" description:"ttl" default:"60"`
+		MultiSegment  bool   `long:"multi-segment" short:"c" description:"multi segment enabled"`
 	}
 
 	_, err := flags.Parse(&opts)
@@ -136,7 +137,7 @@ func main() {
 	n := 0
 	for {
 		<-ticker.C
-		sendSubmitSm(trans, opts.Text, opts.Encoding, opts.From, opts.To, opts.TTL)
+		sendSubmitSm(trans, opts.Text, opts.Encoding, opts.From, opts.To, opts.TTL, opts.MultiSegment)
 		n++
 		currentRps := float64(n) / time.Since(start).Seconds()
 		log.Println("Speed is: ", currentRps)
@@ -165,8 +166,7 @@ func formatValidityPeriod(ttl int) string {
 	return validityPeriod
 }
 
-func sendSubmitSm(trans *gosmpp.Session, text string, encoding string, from string, to string, ttl int) {
-	submitSm := pdu.NewSubmitSM().(*pdu.SubmitSM)
+func sendSubmitSm(trans *gosmpp.Session, text string, encoding string, from string, to string, ttl int, multiSegment bool) {
 
 	srcAddr, _ := pdu.NewAddressWithAddr(from)
 	dstAddr, _ := pdu.NewAddressWithAddr(to)
@@ -194,23 +194,48 @@ func sendSubmitSm(trans *gosmpp.Session, text string, encoding string, from stri
 	default:
 		enc = data.UCS2
 	}
-	message, err := pdu.NewShortMessageWithEncoding(text, enc)
+
+	var err error
+
+	log.Printf("using %T encoding", enc)
+
+	if !multiSegment {
+		submitSm := pdu.NewSubmitSM().(*pdu.SubmitSM)
+		submitSm.SourceAddr = srcAddr
+		submitSm.DestAddr = dstAddr
+		err = submitSm.Message.SetMessageWithEncoding(text, enc)
+		if err != nil {
+			log.Println(err)
+		}
+		submitSm.ValidityPeriod = formatValidityPeriod(ttl)
+		err = trans.Transmitter().Submit(submitSm)
+	} else {
+		submitSm := pdu.NewSubmitSM().(*pdu.SubmitSM)
+		submitSm.SourceAddr = srcAddr
+		submitSm.DestAddr = dstAddr
+		submitSm.ValidityPeriod = formatValidityPeriod(ttl)
+		err = submitSm.Message.SetLongMessageWithEnc(text, enc)
+		if err != nil {
+			log.Println(err)
+		}
+
+		messages, err := submitSm.Split()
+
+		if err != nil {
+			log.Println(err)
+		}
+
+		for _, sub := range messages {
+			if err := trans.Transmitter().Submit(sub); err != nil {
+				break
+			}
+		}
+
+	}
 
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
 	}
 
-	submitSm.SourceAddr = srcAddr
-	submitSm.DestAddr = dstAddr
-	submitSm.Message = message
-	submitSm.ValidityPeriod = formatValidityPeriod(ttl)
-
-	log.Printf("using %T encoding", enc)
-
-	err = trans.Transmitter().Submit(submitSm)
-
-	if err != nil {
-		log.Println(err)
-	}
 }
